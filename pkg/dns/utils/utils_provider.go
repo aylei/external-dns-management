@@ -18,10 +18,13 @@ package utils
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/gardener/controller-manager-library/pkg/utils"
 
 	"github.com/gardener/controller-manager-library/pkg/resources"
 	api "github.com/gardener/external-dns-management/pkg/apis/dns/v1alpha1"
+	"github.com/gardener/external-dns-management/pkg/dns/provider/errors"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -51,7 +54,40 @@ func (this *DNSProviderObject) TypeCode() string {
 	return this.DNSProvider().Spec.Type
 }
 
-func (this *DNSProviderObject) SetState(state, message string) bool {
+func (this *DNSProviderObject) SetStateWithError(state string, err error) bool {
+	type causer interface {
+		error
+		Cause() error
+	}
+
+	message := err.Error()
+	handlerErrorMsg := ""
+	for {
+		if cerr, ok := err.(causer); ok {
+			cause := cerr.Cause()
+			if cause == nil || cause == err {
+				break
+			}
+			if errors.IsHandlerError(cause) {
+				handlerErrorMsg = cause.Error()
+				break
+			}
+			err = cause
+		} else {
+			break
+		}
+	}
+	if handlerErrorMsg != "" {
+		prefix := message
+		if len(message) > len(handlerErrorMsg) && strings.HasSuffix(message, handlerErrorMsg) {
+			prefix = message[:len(message)-len(handlerErrorMsg)]
+		}
+		return this.SetState(api.STATE_ERROR, message, prefix)
+	}
+	return this.SetState(api.STATE_ERROR, message)
+}
+
+func (this *DNSProviderObject) SetState(state, message string, commonMessagePrefix ...string) bool {
 	mod := &utils.ModificationState{}
 	status := &this.DNSProvider().Status
 	mod.AssureStringPtrValue(&status.Message, message)

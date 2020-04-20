@@ -31,6 +31,7 @@ import (
 
 	"github.com/gardener/external-dns-management/pkg/dns"
 	"github.com/gardener/external-dns-management/pkg/dns/provider"
+	perrs "github.com/gardener/external-dns-management/pkg/dns/provider/errors"
 )
 
 type Handler struct {
@@ -74,7 +75,7 @@ func NewHandler(c *provider.DNSHandlerConfig) (provider.DNSHandler, error) {
 
 	authorizer, err := auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID).Authorizer()
 	if err != nil {
-		return nil, fmt.Errorf("Creating Azure authorizer with client credentials failed: %s", err.Error())
+		return nil, perrs.WrapAsHandlerError(err, "Creating Azure authorizer with client credentials failed")
 	}
 
 	zonesClient := azure.NewZonesClient(subscriptionID)
@@ -89,7 +90,7 @@ func NewHandler(c *provider.DNSHandlerConfig) (provider.DNSHandler, error) {
 	h.rateLimiter.Accept()
 	_, err = zonesClient.List(ctx, &one)
 	if err != nil {
-		return nil, fmt.Errorf("Authentication test to Azure with client credentials failed. Please check secret for DNSProvider. Details: %s", err.Error())
+		return nil, perrs.WrapAsHandlerError(err, "Authentication test to Azure with client credentials failed. Please check secret for DNSProvider.")
 	}
 
 	h.zonesClient = &zonesClient
@@ -119,7 +120,7 @@ func (h *Handler) getZones(cache provider.ZoneCache) (provider.DNSHostedZones, e
 	results, err := h.zonesClient.ListComplete(h.ctx, nil)
 	h.config.Metrics.AddRequests("ZonesClient_ListComplete", 1)
 	if err != nil {
-		return nil, fmt.Errorf("Listing DNS zones failed. Details: %s", err.Error())
+		return nil, perrs.WrapAsHandlerError(err, "Listing DNS zones failed")
 	}
 
 	for ; results.NotDone(); results.Next() {
@@ -185,7 +186,7 @@ func (h *Handler) getZoneState(zone provider.DNSHostedZone, cache provider.ZoneC
 	results, err := h.recordsClient.ListAllByDNSZoneComplete(h.ctx, resourceGroup, zoneName, nil, "")
 	h.config.Metrics.AddRequests("RecordSetsClient_ListAllByDNSZoneComplete", 1)
 	if err != nil {
-		return nil, fmt.Errorf("Listing DNS zones failed. Details: %s", err.Error())
+		return nil, perrs.WrapfAsHandlerError(err, "Listing DNS zone state for zone %s failed", zoneName)
 	}
 
 	for ; results.NotDone(); results.Next() {
