@@ -322,7 +322,7 @@ func (this *state) GetEntriesForZone(logger logger.LogContext, zoneid string) (E
 	return entries, nil, false
 }
 
-func (this *state) addEntriesForZone(logger logger.LogContext, entries Entries, stale DNSNames, zone *dnsHostedZone) (Entries, DNSNames, bool) {
+func (this *state) addEntriesForZone(logger logger.LogContext, entries Entries, stale DNSNames, zone DNSHostedZone) (Entries, DNSNames, bool) {
 	if entries == nil {
 		entries = Entries{}
 	}
