@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/gardener/controller-manager-library/pkg/logger"
+	"k8s.io/client-go/util/flowcontrol"
 
 	azure "github.com/Azure/azure-sdk-for-go/services/dns/mgmt/2018-05-01/dns"
 	"github.com/Azure/go-autorest/autorest/azure/auth"
@@ -39,6 +40,7 @@ type Handler struct {
 	ctx           context.Context
 	zonesClient   *azure.ZonesClient
 	recordsClient *azure.RecordSetsClient
+	rateLimiter   flowcontrol.RateLimiter
 }
 
 var _ provider.DNSHandler = &Handler{}
@@ -47,6 +49,7 @@ func NewHandler(c *provider.DNSHandlerConfig) (provider.DNSHandler, error) {
 	h := &Handler{
 		DefaultDNSHandler: provider.NewDefaultDNSHandler(TYPE_CODE),
 		config:            *c,
+		rateLimiter:       c.RateLimiter,
 	}
 
 	h.ctx = c.Context
@@ -83,6 +86,7 @@ func NewHandler(c *provider.DNSHandlerConfig) (provider.DNSHandler, error) {
 	// dummy call to check authentication
 	var one int32 = 1
 	ctx := context.TODO()
+	h.rateLimiter.Accept()
 	_, err = zonesClient.List(ctx, &one)
 	if err != nil {
 		return nil, fmt.Errorf("Authentication test to Azure with client credentials failed. Please check secret for DNSProvider. Details: %s", err.Error())
@@ -111,6 +115,7 @@ func (h *Handler) GetZones() (provider.DNSHostedZones, error) {
 
 func (h *Handler) getZones(cache provider.ZoneCache) (provider.DNSHostedZones, error) {
 	zones := provider.DNSHostedZones{}
+	h.rateLimiter.Accept()
 	results, err := h.zonesClient.ListComplete(h.ctx, nil)
 	h.config.Metrics.AddRequests("ZonesClient_ListComplete", 1)
 	if err != nil {
@@ -142,6 +147,7 @@ func (h *Handler) collectForwardedSubzones(resourceGroup, zoneName string) []str
 	forwarded := []string{}
 	// There should only few NS entries. Therefore no paging is performed for simplicity.
 	var top int32 = 1000
+	h.rateLimiter.Accept()
 	result, err := h.recordsClient.ListByType(h.ctx, resourceGroup, zoneName, azure.NS, &top, "")
 	h.config.Metrics.AddRequests("RecordSetsClient_ListByType_NS", 1)
 	if err != nil {
@@ -175,6 +181,7 @@ func (h *Handler) getZoneState(zone provider.DNSHostedZone, cache provider.ZoneC
 	dnssets := dns.DNSSets{}
 
 	resourceGroup, zoneName := splitZoneid(zone.Id())
+	h.rateLimiter.Accept()
 	results, err := h.recordsClient.ListAllByDNSZoneComplete(h.ctx, resourceGroup, zoneName, nil, "")
 	h.config.Metrics.AddRequests("RecordSetsClient_ListAllByDNSZoneComplete", 1)
 	if err != nil {

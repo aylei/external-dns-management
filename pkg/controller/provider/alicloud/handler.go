@@ -38,11 +38,6 @@ var _ provider.DNSHandler = &Handler{}
 func NewHandler(c *provider.DNSHandlerConfig) (provider.DNSHandler, error) {
 	var err error
 
-	if c.Options != nil {
-		opts := c.Options.(*Config)
-		c.Logger.Infof("**************** handler opt test: %s", opts.Test)
-	}
-
 	h := &Handler{
 		DefaultDNSHandler: provider.NewDefaultDNSHandler(TYPE_CODE),
 		config:            *c,
@@ -57,7 +52,7 @@ func NewHandler(c *provider.DNSHandlerConfig) (provider.DNSHandler, error) {
 		return nil, err
 	}
 
-	access, err := NewAccess(accessKeyID, accessKeySecret, c.Metrics)
+	access, err := NewAccess(accessKeyID, accessKeySecret, c.Metrics, c.RateLimiter)
 	if err != nil {
 		return nil, err
 	}
