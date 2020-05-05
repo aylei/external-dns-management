@@ -26,7 +26,8 @@ import (
 	api "github.com/gardener/external-dns-management/pkg/apis/dns/v1alpha1"
 	"github.com/gardener/external-dns-management/pkg/dns/provider/errors"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	api "github.com/gardener/external-dns-management/pkg/apis/dns/v1alpha1"
+	"github.com/gardener/external-dns-management/pkg/dns/provider/errors"
 )
 
 var DNSProviderType = (*api.DNSProvider)(nil)
@@ -90,7 +91,11 @@ func (this *DNSProviderObject) SetStateWithError(state string, err error) bool {
 func (this *DNSProviderObject) SetState(state, message string, commonMessagePrefix ...string) bool {
 	mod := &utils.ModificationState{}
 	status := &this.DNSProvider().Status
-	mod.AssureStringPtrValue(&status.Message, message)
+	if len(commonMessagePrefix) != 1 || status.Message == nil || !strings.HasPrefix(*status.Message, commonMessagePrefix[0]) {
+		// only update if prefix has changed. This avoids race conditions (state update <-> reconcilie) if message
+		// contains time stamps or correlation ids
+		mod.AssureStringPtrValue(&status.Message, message)
+	}
 	mod.AssureStringValue(&status.State, state)
 	mod.AssureInt64Value(&status.ObservedGeneration, this.DNSProvider().Generation)
 	return mod.IsModified()

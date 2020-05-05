@@ -24,6 +24,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/gardener/external-dns-management/pkg/server/metrics"
+
 	api "github.com/gardener/external-dns-management/pkg/apis/dns/v1alpha1"
 	"github.com/gardener/external-dns-management/pkg/dns"
 	dnsutils "github.com/gardener/external-dns-management/pkg/dns/utils"

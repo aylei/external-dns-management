@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 
+	"github.com/gardener/external-dns-management/pkg/server/metrics"
+
 	api "github.com/gardener/external-dns-management/pkg/apis/dns/v1alpha1"
 	dnsutils "github.com/gardener/external-dns-management/pkg/dns/utils"
 	"github.com/gardener/external-dns-management/pkg/server/metrics"
@@ -359,7 +361,7 @@ func updateDNSProvider(logger logger.LogContext, state *state, provider *dnsutil
 
 	this.account, err = state.GetDNSAccount(logger, provider, props)
 	if err != nil {
-		return this, this.failed(logger, false, fmt.Errorf("%s", err), true)
+		return this, this.failed(logger, false, err, true)
 	}
 
 	this.def_include, this.def_exclude = prepareSelection(provider.DNSProvider().Spec.Domains)
@@ -506,7 +508,7 @@ func (this *dnsProviderVersion) MapTarget(t Target) Target {
 func (this *dnsProviderVersion) setError(modified bool, err error) error {
 	modified = this.object.SetSelection(utils.StringSet{}, utils.StringSet{}, &this.object.Status().Domains) || modified
 	modified = this.object.SetSelection(utils.StringSet{}, utils.StringSet{}, &this.object.Status().Zones) || modified
-	modified = this.object.SetState(api.STATE_ERROR, err.Error()) || modified
+	modified = this.object.SetStateWithError(api.STATE_ERROR, err) || modified
 	if modified {
 		return this.object.UpdateStatus()
 	}
